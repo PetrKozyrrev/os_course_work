@@ -28,7 +28,7 @@ void func(int fd_respond, std::string login)
 }
 
 void write_intro() {
-    std::cout << "___ Welcome to the game Bulls and Cows___" << std::endl;
+    std::cout << "___ Welcome to the game Bulls and Cows ___" << std::endl;
     std::cout << std::endl;
     std::cout << "Input your login: ";
     std::cout.flush();
@@ -39,8 +39,8 @@ void write_menu(std::string login){
     std::cout << "=== MENU ===" << std::endl;
 
     std::cout << "Commands:" << std::endl;
-    std::cout << "1. create (name of the game)" << std::endl;
-    std::cout << "2. connect (name of the game)" << std::endl;
+    std::cout << "1. create [name of the game]" << std::endl;
+    std::cout << "2. connect [name of the game]" << std::endl;
     std::cout << "3. leave\n";
 
     if (login != "admin") std::cout << "4. quit" << std::endl;

@@ -107,7 +107,7 @@ int create_client_pipe(std::string rcvd_name) {
     return fd;
 }
 
-int hit_check(std::string game_word, std::string try_word, int *cows, int *bulls,std::vector<int>& bulls_index,std::vector<int>& cows_index) {
+int hit_check(std::string game_word, std::string try_word, int *cows, int *bulls,std::vector<int>& bulls_cows_index) {
 
     if (try_word.size() != game_word.size()) return -1;
     
@@ -121,19 +121,19 @@ int hit_check(std::string game_word, std::string try_word, int *cows, int *bulls
 
             if(game_word.find(try_word[i]) != std::string::npos){
                 *cows = *cows + 1;
-                cows_index.push_back((int)game_word.find(try_word[i]));
+                bulls_cows_index[i] = 1;
             }
         }
         else{
             *bulls = *bulls + 1;
-            bulls_index.push_back(i);
+            bulls_cows_index[i] = 2;
         }
     }
 
     return 0;
 }
 
-void game_funk (std::string game_name, std::string game_word)
+void game_process(std::string game_name, std::string game_word)
 {
     std::vector<std::string> curr_playrs_name;
     std::vector<int> curr_playrs_fd;
@@ -153,7 +153,7 @@ void game_funk (std::string game_name, std::string game_word)
 
     std::string rcvd_name, rcvd_command, rcvd_data;
 
-    std::vector<int> bulls_index;
+    std::vector<int> bulls_cows_index;
     std::vector<int> cows_index;
 
     while (1)
@@ -171,15 +171,14 @@ void game_funk (std::string game_name, std::string game_word)
 
             send_message_to_client(curr_playrs_fd[PLAYER_ID(rcvd_name)], game_respond.c_str());
             
-            game_respond = "Print: (ans *your attempt*) or (leave)"; 
+            game_respond = "Print: [ans *your attempt*] or [leave]"; 
             
             send_message_to_client(curr_playrs_fd[PLAYER_ID(rcvd_name)], game_respond.c_str());
         }
         else if (rcvd_command == "ans")
         {
-            bulls_index = {};
-            cows_index = {};
-            game_status = hit_check(game_word, rcvd_data, &cows, &bulls, bulls_index, cows_index);
+            bulls_cows_index = {0,0,0,0,0};
+            game_status = hit_check(game_word, rcvd_data, &cows, &bulls, bulls_cows_index);
 
             if (game_status == -1)
             {
@@ -196,24 +195,33 @@ void game_funk (std::string game_name, std::string game_word)
                     game_respond = "winner: " + rcvd_name + "\nanswer =  " + game_word;
                     send_message_to_client(curr_playrs_fd[i], game_respond.c_str());
                     do{
-                        game_respond = "Print: (leave)";
+                        game_respond = "Print: [leave]";
                         send_message_to_client(curr_playrs_fd[i], game_respond.c_str());
                         recieve_message_server(game_input_fd, &rcvd_name, &rcvd_command, &rcvd_data);
                     }while(rcvd_command != "leave");
                 }
 
                 close(game_input_fd);
+
+                std::cout << "FINISH GAME: " << game_name << std::endl;
+                std::cout.flush();
+                int mainFD = open("main_input", O_RDWR);
+                game_respond = "finish";
+                send_message_to_server(mainFD, game_name, game_respond, "");
+                return;
             }
             else if (game_status == 0)
             {
                 std::string cows_symbols = " symbols: ";
-                for(int elem {0}; elem < cows_index.size(); ++elem){
-                    cows_symbols = cows_symbols + game_word[elem] + " "; 
+                for(int elem {0}; elem < bulls_cows_index.size(); ++elem){
+                    if(bulls_cows_index[elem] == 1)
+                        cows_symbols = cows_symbols + rcvd_data[elem] + " "; 
                 }
 
                 std::string bulls_symbols = " symbols: ";
-                for(int elem {0}; elem < bulls_index.size(); ++elem){
-                    bulls_symbols = bulls_symbols + game_word[elem] + " "; 
+                for(int elem {0}; elem < bulls_cows_index.size(); ++elem){
+                    if(bulls_cows_index[elem] == 2)
+                        bulls_symbols = bulls_symbols + rcvd_data[elem] + " "; 
                 }
 
                 game_respond = "Cows: " + std::to_string(cows) + cows_symbols + "\nBulls: " + std::to_string(bulls) + bulls_symbols;
@@ -290,34 +298,21 @@ int main()
             
             games_name.push_back(game_name_table);
             
-            games_threads.push_back(std::thread(game_funk, game_name_table, game_word));
+            games_threads.push_back(std::thread(game_process, game_name_table, game_word));
         }
-        else if (rcvd_command == "finish")
+         else if (rcvd_command == "finish")
         {
             std::remove(("game_%" + rcvd_name).c_str());
             
-            std::cout<<"TEST\n";
-            
-            std::cout.flush();
-            
             games_threads[in(games_name, rcvd_name)].detach();
-            
-            std::cout<<"TEST\n";
-            std::cout.flush();
             
             iter_game_thread = games_threads.cbegin();
             
             games_threads.erase(iter_game_thread + in(games_name, rcvd_name));
             
-            std::cout<<"TEST\n";
-            std::cout.flush();
-            
             iter_game_name = games_name.cbegin();
             
             games_name.erase(iter_game_name + in(games_name, rcvd_name));
-            
-            std::cout<<"TEST\n";
-            std::cout.flush();
             
         }
         else if (rcvd_command == "quit")
